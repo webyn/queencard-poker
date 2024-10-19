@@ -9,6 +9,7 @@ import com.entjava.poker.hand.HandIdentifier;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -37,15 +38,26 @@ public class Game {
     public Game(DeckBuilder deckBuilder,
                 HandIdentifier handIdentifier,
                 WinningHandCalculator winningHandCalculator) {
-        players.add(new Player("Alex"));
-        players.add(new Player("Bob"));
-        players.add(new Player("Jane"));
+        players.add(new Player("Dadan"));
+        players.add(new Player("Haze"));
+        players.add(new Player("Joanny"));
+        players.add(new Player("Migs"));
+        players.add(new Player("Jude"));
+        players.add(new Player("Robyn"));
+        players.add(new Player("Jesse"));
 
         this.deckBuilder = deckBuilder;
         this.handIdentifier = handIdentifier;
         this.winningHandCalculator = winningHandCalculator;
 
+        randomizePlayers(3);
         startNewGame();
+    }
+
+    private void randomizePlayers(int numberOfPlayers)
+    {
+        Collections.shuffle(players); // Shuffle the player list
+        players = players.subList(0, numberOfPlayers); // Keep only the first 'numberOfPlayers' players
     }
 
     /**

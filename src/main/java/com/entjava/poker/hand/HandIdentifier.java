@@ -1,14 +1,16 @@
 package com.entjava.poker.hand;
 
+import com.entjava.poker.card.CardSuit;
 import com.entjava.poker.hand.types.*;
 import com.entjava.poker.card.Card;
 import com.entjava.poker.card.CardRank;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
- * A service that is to used to identify the {@link Hand} given the player's cards and the community
+ * A service that is used to identify the {@link Hand} given the player's cards and the community
  * cards.
  */
 @Component
@@ -23,8 +25,8 @@ public class HandIdentifier {
      */
     public Hand identifyHand(List<Card> playerCards, List<Card> communityCards) {
 
-        if(communityCards.isEmpty()) {
-            if(playerCards.stream().allMatch((Card card) -> card.getRank() == playerCards.get(0).getRank())) {
+        if (communityCards.isEmpty()) {
+            if (playerCards.stream().allMatch((Card card) -> card.getRank() == playerCards.get(0).getRank())) {
                 return new OnePair(playerCards, new ArrayList<>());
             } else {
                 return new HighCard(playerCards);
@@ -35,123 +37,156 @@ public class HandIdentifier {
         combinedCards.addAll(playerCards);
         combinedCards.addAll(communityCards);
 
-        Collections.sort(combinedCards,Collections.reverseOrder());
+        combinedCards.sort(Collections.reverseOrder());
 
-        HashMap<String,List<Card>> sameCardSuitMap = new HashMap<>();
-        for (Card c : combinedCards) {
-            if(sameCardSuitMap.containsKey(c.getSuit().toString())) {
-                sameCardSuitMap.get(c.getSuit().toString()).add(c);
+        // Map to track same suits
+        Map<String, List<Card>> sameCardSuitMap = combinedCards.stream()
+                .collect(Collectors.groupingBy(c -> c.getSuit().toString()));
+
+        // Check for flush or straight flush
+        List<Card> sameSuitCardsList = sameCardSuitMap.values().stream()
+                .filter(l -> l.size() >= 5)
+                .findFirst()
+                .orElse(new ArrayList<>());
+
+        if (!sameSuitCardsList.isEmpty()) {
+            // Check for Royal Flush (A, K, Q, J, 10 of the same suit)
+            if (isRoyalFlush(sameSuitCardsList)) {
+                return new RoyalFlush(sameSuitCardsList.subList(0, 5)); // Return the royal flush cards
+            }
+
+            // Check for Straight Flush
+            if (isStraight(sameSuitCardsList)) {
+                return new StraightFlush(sameSuitCardsList.subList(0, 5)); // Return the top 5 cards of straight flush
             } else {
-                List<Card> tempCardsList = new ArrayList<>();
-                tempCardsList.add(c);
-                sameCardSuitMap.put(c.getSuit().toString(),tempCardsList);
+                return new Flush(sameSuitCardsList.subList(0, 5)); // Return the top 5 flush cards
             }
         }
 
-        // check for five card hands
-        // check for cards with same suits of 5
-        List<Card> sameSuitCardsList = sameCardSuitMap.values().stream().filter(l -> l.size()>=5).findFirst().orElse(new ArrayList<>());
+        // Map to track same ranks
+        Map<String, List<Card>> sameCardRankMap = combinedCards.stream()
+                .collect(Collectors.groupingBy(c -> c.getRank().toString()));
 
-        if(sameSuitCardsList.size()!=0) {
+        // Four of a kind checker
+        List<Card> fourOfAKindList = sameCardRankMap.values().stream()
+                .filter(l -> l.size() == 4)
+                .findFirst()
+                .orElse(new ArrayList<>());
 
-            boolean isStraight = false;
-
-            if(sameSuitCardsList.get(0).getRank() == CardRank.ACE) {
-                sameSuitCardsList.add(sameSuitCardsList.get(0));
-            }
-            for(int ctr = 0; ctr < (sameSuitCardsList.size() - 4); ++ctr ) {
-                int diffOfHighAndLowCards = sameSuitCardsList.get(ctr).getRank().ordinal() - sameSuitCardsList.get(ctr+4).getRank().ordinal();
-                if(diffOfHighAndLowCards==4 || diffOfHighAndLowCards == -8) {
-                    sameSuitCardsList = sameSuitCardsList.subList(ctr,sameSuitCardsList.size());
-                    isStraight = true;
-                }
-            }
-
-            if(isStraight) {
-                return new StraightFlush(sameSuitCardsList);
-            } else {
-                return new Flush(sameSuitCardsList);
-            }
-        }
-
-
-
-        Map<String,List<Card>> sameCardRankMap = new LinkedHashMap<>();
-        for (Card c : combinedCards) {
-            if(sameCardRankMap.containsKey(c.getRank().toString())) {
-                sameCardRankMap.get(c.getRank().toString()).add(c);
-            } else {
-                List<Card> tempCardsList = new ArrayList<>();
-                tempCardsList.add(c);
-                sameCardRankMap.put(c.getRank().toString(),tempCardsList);
-            }
-        }
-
-        // four of a kind checker
-        List<Card> fourOfAKindList = sameCardRankMap.values().stream().filter(l -> l.size()==4).findFirst().orElse(new ArrayList<>());
-
-        if(fourOfAKindList.size()!=0) {
+        if (!fourOfAKindList.isEmpty()) {
             combinedCards.removeAll(fourOfAKindList);
-            return new FourOfAKind(fourOfAKindList, combinedCards);
+            return new FourOfAKind(fourOfAKindList, combinedCards.subList(0, 1)); // Kicker is the highest remaining card
         }
 
-        // check for straight
-        List<Card> straightList = new ArrayList<>();
-        int listIndex = 0;
-        straightList.add(combinedCards.get(0));
+        // Full house or Three of a kind checker
+        List<Card> threeOfAKindList = sameCardRankMap.values().stream()
+                .filter(l -> l.size() == 3)
+                .findFirst()
+                .orElse(new ArrayList<>());
 
-        for(int ctr = 1; ctr < combinedCards.size(); ++ctr) {
-            if(straightList.get(listIndex).getRank()!=combinedCards.get(ctr).getRank()) {
-                straightList.add(combinedCards.get(ctr));
-                ++listIndex;
-            }
-        }
-
-        if(straightList.get(0).getRank()==CardRank.ACE)
-            straightList.add(combinedCards.get(0));
-
-        for(int ctr = 0; ctr < (straightList.size() - 4); ++ctr ) {
-            int diff = straightList.get(ctr).getRank().ordinal() - straightList.get(ctr+4).getRank().ordinal();
-            if(diff==4 || diff == -8) {
-
-                straightList.subList(ctr,straightList.size());
-                return new Straight(straightList);
-            }
-        }
-
-        // three of a kind checker
-        List<Card> threeOfAKindList = sameCardRankMap.values().stream().filter(l -> l.size()==3).findFirst().orElse(new ArrayList<>());
-
-        if(threeOfAKindList.size()!=0) {
-            // check for pair kickers, this will be full house
+        if (!threeOfAKindList.isEmpty()) {
             sameCardRankMap.remove(threeOfAKindList.get(0).getRank().toString());
-            List<Card> fullHouseKickerList = sameCardRankMap.values().stream().filter(l -> l.size()>=2).findFirst().orElse(new ArrayList<>());
+            List<Card> fullHouseKickerList = sameCardRankMap.values().stream()
+                    .filter(l -> l.size() >= 2)
+                    .findFirst()
+                    .orElse(new ArrayList<>());
 
-            if(fullHouseKickerList.size()!=0) {
-                return new FullHouse(threeOfAKindList, fullHouseKickerList);
+            if (!fullHouseKickerList.isEmpty()) {
+                return new FullHouse(threeOfAKindList, fullHouseKickerList.subList(0, 2)); // Pair for the full house
             } else {
                 combinedCards.removeAll(threeOfAKindList);
-                return new ThreeOfAKind(threeOfAKindList, combinedCards);
+                return new ThreeOfAKind(threeOfAKindList, combinedCards.subList(0, 2)); // Kickers are the top 2 remaining cards
             }
         }
 
-        List<Card> twoOfAKindList = sameCardRankMap.values().stream().filter(l -> l.size()==2).findFirst().orElse(new ArrayList<>());
+        // Check for two pair or one pair
+        List<Card> twoOfAKindList = sameCardRankMap.values().stream()
+                .filter(l -> l.size() == 2)
+                .findFirst()
+                .orElse(new ArrayList<>());
 
-        if(twoOfAKindList.size()!=0) {
+        if (!twoOfAKindList.isEmpty()) {
             sameCardRankMap.remove(twoOfAKindList.get(0).getRank().toString());
-            List<Card> twoOfAKindList2 = sameCardRankMap.values().stream().filter(l -> l.size()==2).findFirst().orElse(new ArrayList<>());
+            List<Card> secondPairList = sameCardRankMap.values().stream()
+                    .filter(l -> l.size() == 2)
+                    .findFirst()
+                    .orElse(new ArrayList<>());
 
-            if(twoOfAKindList2.size()!=0) {
+            if (!secondPairList.isEmpty()) {
                 combinedCards.removeAll(twoOfAKindList);
-                combinedCards.removeAll(twoOfAKindList2);
-                return new TwoPair(twoOfAKindList,twoOfAKindList2,combinedCards);
-
+                combinedCards.removeAll(secondPairList);
+                return new TwoPair(twoOfAKindList, secondPairList, combinedCards.subList(0, 1)); // Kicker is top remaining card
             } else {
                 combinedCards.removeAll(twoOfAKindList);
-                return new OnePair(twoOfAKindList,combinedCards);
+                return new OnePair(twoOfAKindList, combinedCards.subList(0, 3)); // Kickers are the top 3 remaining cards
             }
         }
 
-        return new HighCard(combinedCards);
+        // Check for straight (no flush)
+        if (isStraight(combinedCards)) {
+            return new Straight(combinedCards.subList(0, 5)); // Return the top 5 cards of the straight
+        }
+
+        // Default to high card
+        return new HighCard(combinedCards.subList(0, 5)); // Return the top 5 cards
+    }
+
+    /**
+     * Checks if the given list of cards forms a straight.
+     *
+     * @param cards List of cards sorted in descending order
+     * @return true if the list forms a straight, otherwise false
+     */
+    private boolean isStraight(List<Card> cards) {
+        List<Integer> ranks = cards.stream()
+                .map(card -> card.getRank().ordinal())
+                .distinct()
+                .sorted(Comparator.reverseOrder())
+                .collect(Collectors.toList());
+
+        // Special case for Ace-low straight
+        if (ranks.contains(CardRank.ACE.ordinal()) &&
+                ranks.contains(CardRank.TWO.ordinal()) &&
+                ranks.contains(CardRank.THREE.ordinal()) &&
+                ranks.contains(CardRank.FOUR.ordinal()) &&
+                ranks.contains(CardRank.FIVE.ordinal())) {
+            return true;
+        }
+
+        // Check for a normal straight
+        for (int i = 0; i < ranks.size() - 4; i++) {
+            if (ranks.get(i) - ranks.get(i + 4) == 4) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if the given list of cards forms a Royal Flush.
+     *
+     * @param cards List of cards all of the same suit
+     * @return true if the list forms a Royal Flush, otherwise false
+     */
+    private boolean isRoyalFlush(List<Card> cards)
+    {
+        if (cards.size() < 5)
+            return false; // Ensure there are enough cards
+
+        // Check if all cards are of the same suit
+        CardSuit cardSuit = cards.get(0).getSuit();
+        if (!cards.stream().allMatch(card -> card.getSuit() == cardSuit))
+        {
+            return false;
+        }
+
+        // Define the Royal Flush ranks
+        Set<CardRank> royalRanks = EnumSet.of(CardRank.TEN, CardRank.JACK,
+                CardRank.QUEEN, CardRank.KING, CardRank.ACE);
+        Set<CardRank> cardRanks = cards.stream()
+                .map(Card::getRank)
+                .collect(Collectors.toSet());
+
+        return cardRanks.containsAll(royalRanks);
     }
 }

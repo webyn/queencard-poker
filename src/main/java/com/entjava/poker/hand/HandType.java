@@ -25,6 +25,7 @@ public enum HandType {
     FLUSH,
     FULL_HOUSE,
     FOUR_OF_A_KIND,
-    STRAIGHT_FLUSH
+    STRAIGHT_FLUSH,
+    ROYAL_FLUSH,
 
 }
