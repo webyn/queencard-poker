@@ -103,9 +103,14 @@ public class Game {
             dealOneCommunityCard();
         }
 
+        // Identify hands after each community card deal
+        players.forEach(player -> {
+            Hand playerHand = handIdentifier.identifyHand(player.getHand(), communityCards);
+            player.setPlayableHand(playerHand);
+        });
+
         if (hasEnded()) {
             identifyWinningHand();
-            System.out.println(winningHand.getCurrentHand());
         }
     }
 
