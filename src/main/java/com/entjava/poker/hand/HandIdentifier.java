@@ -25,13 +25,15 @@ public class HandIdentifier {
      */
     public Hand identifyHand(List<Card> playerCards, List<Card> communityCards) {
 
-        if (communityCards.isEmpty()) {
-            if (playerCards.stream().allMatch((Card card) -> card.getRank() == playerCards.get(0).getRank())) {
-                return new OnePair(playerCards, new ArrayList<>());
-            } else {
+
+            if (communityCards.isEmpty()) {
+                // Initial hand with just player cards
+                if (playerCards.stream().allMatch(card -> card.getRank() == playerCards.get(0).getRank())) {
+                    return new OnePair(playerCards, new ArrayList<>());
+                }
                 return new HighCard(playerCards);
             }
-        }
+        
 
         List<Card> combinedCards = new ArrayList<>();
         combinedCards.addAll(playerCards);
