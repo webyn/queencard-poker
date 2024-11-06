@@ -203,5 +203,12 @@ public class Game {
     public String displayCurrentHand(Player player) {
         return player.getHand().get(0).getRank().toString();
     }
-
+    public Optional<Player> getWinner() {
+        if (winningHand == null) {
+            return Optional.empty();
+        }
+        return players.stream()
+            .filter(player -> player.getPlayableHand().equals(winningHand))
+            .findFirst();
+    }
 }
